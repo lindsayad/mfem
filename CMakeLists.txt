@@ -829,7 +829,8 @@ foreach(Header mfem.hpp mfem-performance.hpp)
 endforeach()
 install(FILES ${MASTER_HEADERS} DESTINATION ${INSTALL_INCLUDE_DIR}/mfem)
 
-# Install the headers; currently, the miniapps headers are excluded
+# Install the headers. Note that miniapp header installation is dictated from
+# its subdirectory
 install(DIRECTORY ${MFEM_SOURCE_DIRS}
   DESTINATION ${INSTALL_INCLUDE_DIR}/mfem
   FILES_MATCHING PATTERN "*.hpp")
