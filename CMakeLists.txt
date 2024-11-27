@@ -165,6 +165,9 @@ set(CMAKE_MACOSX_RPATH OFF CACHE BOOL "")
 set(MFEM_CMAKE_PATH ${PROJECT_SOURCE_DIR}/config)
 set(CMAKE_MODULE_PATH ${MFEM_CMAKE_PATH}/cmake/modules)
 
+# Load standard install paths
+include(GNUInstallDirs)
+
 # Load MFEM CMake utilities.
 include(MfemCmakeUtilities)
 
@@ -615,7 +618,7 @@ set(MASTER_HEADERS
   ${PROJECT_SOURCE_DIR}/mfem.hpp
   ${PROJECT_SOURCE_DIR}/mfem-performance.hpp)
 
-set(_lib_path "${CMAKE_INSTALL_PREFIX}/lib")
+set(_lib_path "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON CACHE BOOL "")
 set(CMAKE_INSTALL_RPATH "${_lib_path}" CACHE PATH "")
 set(CMAKE_INSTALL_NAME_DIR "${_lib_path}" CACHE PATH "")
@@ -796,19 +799,13 @@ add_subdirectory(doc)
 #-------------------------------------------------------------------------------
 
 message(STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}")
-set(INSTALL_INCLUDE_DIR include
-  CACHE PATH "Relative path for installing header files.")
-set(INSTALL_BIN_DIR bin
-  CACHE PATH "Relative path for installing the binaries.")
-set(INSTALL_LIB_DIR lib
-  CACHE PATH "Relative path for installing the library.")
 # other options: "share/mfem/cmake", "lib/mfem/cmake"
-set(INSTALL_CMAKE_DIR lib/cmake/mfem
+set(INSTALL_CMAKE_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/mfem
   CACHE PATH "Relative path for installing cmake config files.")
 
 target_include_directories(mfem BEFORE
   PUBLIC
-    $<INSTALL_INTERFACE:${INSTALL_INCLUDE_DIR}>)
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 # The 'install' target will not depend on 'all'.
 # set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY TRUE)
@@ -818,34 +815,34 @@ set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME Development)
 # Install the library
 install(TARGETS ${PROJECT_NAME}
   EXPORT ${PROJECT_NAME_UC}Targets
-  RUNTIME DESTINATION ${INSTALL_BIN_DIR}
-  LIBRARY DESTINATION ${INSTALL_LIB_DIR}
-  ARCHIVE DESTINATION ${INSTALL_LIB_DIR})
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 # Install the master headers
 foreach(Header mfem.hpp mfem-performance.hpp)
   install(FILES ${PROJECT_BINARY_DIR}/InstallHeaders/${Header}
-    DESTINATION ${INSTALL_INCLUDE_DIR})
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 endforeach()
-install(FILES ${MASTER_HEADERS} DESTINATION ${INSTALL_INCLUDE_DIR}/mfem)
+install(FILES ${MASTER_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mfem)
 
 # Install the headers. Note that miniapp header installation is dictated from
 # its subdirectory
 install(DIRECTORY ${MFEM_SOURCE_DIRS}
-  DESTINATION ${INSTALL_INCLUDE_DIR}/mfem
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mfem
   FILES_MATCHING PATTERN "*.hpp")
 
 # Install the okl files
 if (MFEM_USE_OCCA)
   install(DIRECTORY ${MFEM_SOURCE_DIRS}
-    DESTINATION ${INSTALL_INCLUDE_DIR}/mfem
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mfem
     FILES_MATCHING PATTERN "*.okl")
 endif()
 
 # Install the libCEED files
 if (MFEM_USE_CEED)
   install(DIRECTORY ${MFEM_SOURCE_DIRS}
-    DESTINATION ${INSTALL_INCLUDE_DIR}/mfem
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mfem
     FILES_MATCHING PATTERN "fem/ceed/integrators/*/*.h")
 endif()
 
@@ -854,14 +851,14 @@ endif()
 # foreach (HDR ${HEADERS})
 #   file(RELATIVE_PATH REL_HDR ${PROJECT_SOURCE_DIR} ${HDR})
 #   get_filename_component(DIR ${REL_HDR} PATH)
-#   install(FILES ${REL_HDR} DESTINATION ${INSTALL_INCLUDE_DIR}/${DIR})
+#   install(FILES ${REL_HDR} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${DIR})
 # endforeach()
 
 # Install the configuration header files
 install(FILES ${PROJECT_BINARY_DIR}/config/_config.hpp
   ${PROJECT_SOURCE_DIR}/config/config.hpp
   ${PROJECT_SOURCE_DIR}/config/tconfig.hpp
-  DESTINATION ${INSTALL_INCLUDE_DIR}/mfem/config)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mfem/config)
 
 # Package the whole thing up nicely
 include(CMakePackageConfigHelpers)
@@ -884,8 +881,8 @@ configure_package_config_file(config/cmake/MFEMConfig.cmake.in
   PATH_VARS INCLUDE_INSTALL_DIRS LIB_INSTALL_DIR)
 
 # This is the version that will be installed
-set(INCLUDE_INSTALL_DIRS ${INSTALL_INCLUDE_DIR}  ${TPL_INCLUDE_DIRS})
-set(LIB_INSTALL_DIR ${INSTALL_LIB_DIR})
+set(INCLUDE_INSTALL_DIRS ${CMAKE_INSTALL_INCLUDEDIR}  ${TPL_INCLUDE_DIRS})
+set(LIB_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})
 configure_package_config_file(config/cmake/MFEMConfig.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/MFEMConfig.cmake
   INSTALL_DESTINATION ${INSTALL_CMAKE_DIR}
