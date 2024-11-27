@@ -160,9 +160,13 @@ endif()
 
 set(CMAKE_MACOSX_RPATH ON CACHE BOOL "")
 
-# Set policy CMP0068 to NEW so that install_name will include RPATH settings
-if(POLICY CMP0068)
-    cmake_policy(SET CMP0068 NEW)
+if (APPLE)
+   # Set policy CMP0068 to NEW so that install_name will include RPATH settings
+   if(POLICY CMP0068)
+       cmake_policy(SET CMP0068 NEW)
+   endif()
+
+   set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 endif()
 
 # CMake needs to know where to find things
