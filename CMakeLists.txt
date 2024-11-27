@@ -759,7 +759,11 @@ endif()
 # Create a target for all miniapps and, optionally, enable it.
 set(MFEM_ALL_MINIAPPS_TARGET_NAME miniapps)
 add_mfem_target(${MFEM_ALL_MINIAPPS_TARGET_NAME} ${MFEM_ENABLE_MINIAPPS})
-add_subdirectory(miniapps EXCLUDE_FROM_ALL)
+if (MFEM_ENABLE_MINIAPPS)
+  add_subdirectory(miniapps) #install miniapps if enabled
+else()
+  add_subdirectory(miniapps EXCLUDE_FROM_ALL)
+endif()
 
 # Target to build all executables, i.e. everything.
 add_custom_target(exec)
