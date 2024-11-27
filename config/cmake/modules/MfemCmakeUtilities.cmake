@@ -102,7 +102,9 @@ macro(add_mfem_examples EXE_SRCS)
     add_dependencies(${EXE_NAME}
       ${MFEM_EXEC_PREREQUISITES_TARGET_NAME} ${EXE_PREREQUISITE})
 
-    set_target_properties(${EXE_NAME} PROPERTIES INSTALL_RPATH "@loader_path/${REL_LIB_DIR}")
+    if (APPLE)
+      set_target_properties(${EXE_NAME} PROPERTIES INSTALL_RPATH "@loader_path/${REL_LIB_DIR}")
+    endif()
     target_link_libraries(${EXE_NAME} mfem)
   endforeach(SRC_FILE)
 endmacro()

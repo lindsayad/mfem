@@ -667,9 +667,11 @@ endif()
 file(RELATIVE_PATH REL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}" "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 set_target_properties(mfem PROPERTIES VERSION "${mfem_VERSION}")
 set_target_properties(mfem PROPERTIES SOVERSION "${mfem_VERSION}")
-set_target_properties(mfem PROPERTIES INSTALL_NAME_DIR "@rpath")
-set_target_properties(mfem PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
-set_target_properties(mfem PROPERTIES INSTALL_RPATH "@loader_path/${REL_LIB_DIR}")
+if (APPLE)
+   set_target_properties(mfem PROPERTIES INSTALL_NAME_DIR "@rpath")
+   set_target_properties(mfem PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
+   set_target_properties(mfem PROPERTIES INSTALL_RPATH "@loader_path/${REL_LIB_DIR}")
+endif()
 
 # If building out-of-source, define MFEM_CONFIG_FILE to point to the config file
 # inside the build directory.
