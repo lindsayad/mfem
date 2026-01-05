@@ -1182,25 +1182,6 @@ public:
    virtual real_t Eval(const Vector &x, const Vector &y) = 0;
 };
 
-class SliceOperator : public Operator
-{
-   int offset;
-
- public:
-   SliceOperator(int height, int width, int offset_)
-       : Operator(height, width), offset(offset_)
-   {
-   }
-
-   MemoryClass GetMemoryClass() const override
-   {
-      return Device::GetDeviceMemoryClass();
-   }
-
-   void Mult(const Vector &x, Vector &y) const override;
-   void MultTranspose(const Vector &x, Vector &y) const override;
-};
-
 /** @brief PowerMethod helper class to estimate the largest eigenvalue of an
            operator using the iterative power method. */
 class PowerMethod
