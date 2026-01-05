@@ -108,22 +108,8 @@ public:
                          static_cast<int>(std::pow(dtq.nqpt, mesh.Dimension())) :
                          ir.GetNPoints();
 
-      const auto ne_l = mesh.GetNE();
-
-      lsize = vdim * num_qp * ne_l;
-      tsize = lsize;
-      offset = 0;
-
-#ifdef MFEM_USE_MPI
-      if (auto *const pmesh = dynamic_cast<ParMesh *>(&mesh))
-      {
-         const auto comm = pmesh->GetComm();
-         MPI_Allreduce(MPI_IN_PLACE, &tsize, 1, MPI_INT, MPI_SUM, comm);
-         MPI_Exscan(&lsize, &offset, 1, MPI_INT, MPI_SUM, comm);
-         const auto myrank = pmesh->GetMyRank();
-         if (myrank == 0) offset = 0;
-      }
-#endif
+      tsize = vdim * num_qp * mesh.GetNE();
+      lsize = tsize;
    }
 
    int GetTrueVSize() const override
@@ -136,34 +122,12 @@ public:
       return lsize;
    }
 
-   const Operator *GetProlongationMatrix() const override
-   {
-      if (!prolongation)
-      {
-         prolongation.reset(new SliceOperator(lsize, tsize, offset));
-      }
-      return prolongation.get();
-   }
-
-   const Operator *GetElementRestriction(ElementDofOrdering) const override
-   {
-      if (!elem_restr)
-      {
-         // L-vector is already element-stacked, so restriction is just the identity
-         elem_restr.reset(new IdentityOperator(lsize));
-      }
-      return elem_restr.get();
-   }
-
 private:
    /// T-vector size
    int tsize;
 
    /// L-vector size
    int lsize;
-
-   /// Offset for our rank's ownership of the T-vector
-   int offset;
 };
 
 class ParameterFunction : public Vector
