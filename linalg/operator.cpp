@@ -868,6 +868,30 @@ real_t InnerProductOperator::Dot(const Vector &x, const Vector &y) const
 #endif
 }
 
+void SliceOperator::Mult(const Vector &x, Vector &y) const
+{
+   MFEM_ASSERT(x.Size() == width, "Incoming vector size must match our width");
+   y.SetSize(height);
+
+   const auto *const dx = x.Read();
+   auto *const dy = y.Write();
+   const auto dh = height;
+   const auto doffset = offset;
+   mfem::forall(dh, [=] MFEM_HOST_DEVICE(int i) { dy[i] = dx[doffset + i]; });
+}
+
+void SliceOperator::MultTranspose(const Vector &x, Vector &y) const
+{
+   MFEM_ASSERT(x.Size() == height,
+               "Incoming vector size must match our height");
+   y.SetSize(width);
+   const auto *const dx = x.Read();
+   auto *const dy = y.Write();
+   const auto doffset = offset;
+   const auto dh = height;
+   mfem::forall(dh, [=] MFEM_HOST_DEVICE(int i) { dy[doffset + i] = dx[i]; });
+}
+
 real_t PowerMethod::EstimateLargestEigenvalue(Operator& opr, Vector& v0,
                                               int numSteps, real_t tolerance,
                                               int seed)
