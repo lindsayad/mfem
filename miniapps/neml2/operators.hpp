@@ -47,182 +47,34 @@ class NEML2StressDivergenceIntegrator
     */
    void AddMultGradPA(const Vector &x, Vector &y) const override;
 
-   struct Strain
-   {
-      /**
-     * @brief Compute the strain from the displacement gradient and the Jacobian
-     *
-     * For small strain, $\varepsilon = \frac{1}{2} \left( \nabla u + \nabla u^T
-     * \right)$, with $\nabla u = \frac{\partial u}{\partial x} = \frac{\partial
-     * u}{\partial \xi} \cdot \frac{\partial \xi}{\partial x} = \frac{\partial
-     * u}{\partial \xi} \cdot J^{-1}$.
-     *
-     * @param dudxi Displacement gradient in parametric coordinates
-     * @param J Jacobian of the parametric to physical mapping
-     */
-      MFEM_HOST_DEVICE auto operator()(const tensor<dscalar_t, 3, 3> &dudxi,
-                                       const tensor<real_t, 3, 3> &J) const
-      {
-         const auto dudx = dudxi * inv(J);
-         const auto e = real_t(0.5) * (dudx + transpose(dudx));
-         // NEML2 uses Mandel notation for symmetric 2nd order tensors.
-         constexpr real_t sqrt2 = 1.4142135623730951_r;
-         const auto e_mandel = tensor<dscalar_t, 6>{e(0, 0),
-                                                    e(1, 1),
-                                                    e(2, 2),
-                                                    sqrt2 * e(1, 2),
-                                                    sqrt2 * e(0, 2),
-                                                    sqrt2 * e(0, 1)};
-         return tuple{e_mandel};
-      }
-   };
-
-   struct StressDivergence
-   {
-      /**
-     * @brief Compute the stress divergence contribution to the residual
-     *
-     * Given the stress tensor $\sigma$, the contribution to the residual at
-     * quadrature point is given by $\nabla \phi \cdot \sigma$.
-     *
-     * @note The definition here appears incomplete, but it's not;
-     * multiplication by B^T is handled by the DifferentiableOperator's output
-     * operator.
-     *
-     * @param stress Stress tensor in Mandel notation at the quadrature point
-     * @param J Jacobian of the parametric to physical mapping
-     * @param w Quadrature weight
-     */
-      MFEM_HOST_DEVICE auto operator()(const tensor<dscalar_t, 6> &stress,
-                                       const tensor<real_t, 3, 3> &J,
-                                       const real_t &w) const
-      {
-         constexpr real_t sqrt2 = 1.4142135623730951_r;
-         const auto stress_tensor = tensor<dscalar_t, 3, 3>{stress(0),
-                                                            stress(5) / sqrt2,
-                                                            stress(4) / sqrt2,
-                                                            stress(5) / sqrt2,
-                                                            stress(1),
-                                                            stress(3) / sqrt2,
-                                                            stress(4) / sqrt2,
-                                                            stress(3) / sqrt2,
-                                                            stress(2)};
-         const auto div_sigma = stress_tensor * transpose(inv(J)) * det(J) * w;
-         return tuple{div_sigma};
-      }
-   };
-
-   /**
-   * @brief Jacobian operator for the linear momentum balance equation
-   *
-   */
-   class LinearMomentumBalanceJacobian : public Operator
-   {
-    public:
-      LinearMomentumBalanceJacobian(const LinearMomentumBalance &r,
-                                    const Vector &X);
-
-      /**
-     * @brief Perform Jacobian evaluation
-     *
-     * @param dX Input delta displacement L-vector
-     * @param dR Output delta residual L-vector
-     */
-      void Mult(const Vector &dX, Vector &dR) const override;
-
-    private:
-      /// The underlying linear momentum balance operator
-      const LinearMomentumBalance &_op;
-      /// The quadrature space for symmetric 2nd order tensors
-      UniformParameterSpace _q_space_symr2;
-      /// Temporary storage for delta strain
-      mutable ParameterFunction _delta_strain;
-      /// Temporary storage for delta stress
-      mutable ParameterFunction _delta_stress;
-      /// Material tangent (dstress/dstrain) obtained from NEML2 evaluated at the
-      /// current strain
-      neml2::Tensor _tangent;
-   };
-
-   class AutodiffLinearMomentumBalanceJacobian : public Operator
-   {
-    public:
-      AutodiffLinearMomentumBalanceJacobian(const LinearMomentumBalance *momentum_balance,
-                                            const Vector &x);
-
-      void Mult(const Vector &x, Vector &y) const override;
-
-      // Pointer to the wrapped momentum balance operator
-      const LinearMomentumBalance *momentum_balance = nullptr;
-
-      // Pointer to the DerivativeOperator that computes dstrain/du
-      std::shared_ptr<DerivativeOperator> dstrain_du;
-      /// Pointer to the DerivativeOperator that computes dR/dstress
-      std::shared_ptr<DerivativeOperator> dres_dstress;
-
-    private:
-      /// The quadrature space for symmetric 2nd order tensors
-      UniformParameterSpace _q_space_symr2;
-      /// Saved strain corresponding to our input solution X
-      ParameterFunction _strain;
-      /// Saved stress corresponding to our input solution X
-      ParameterFunction _stress;
-
-      /// Temporary storage for delta strain
-      mutable ParameterFunction _delta_strain;
-      /// Temporary storage for delta stress
-      mutable ParameterFunction _delta_stress;
-
-      /// Material tangent (dstress/dstrain) obtained from NEML2 evaluated at the
-      /// current strain
-      neml2::Tensor _tangent;
-   };
-
-   /// The strain operator
-   std::unique_ptr<DifferentiableOperator> strain_op;
-   /// The constitutive model "operator"
-   std::unique_ptr<ConstitutiveModel> constit_op;
-   /// The stress divergence operator
-   std::unique_ptr<DifferentiableOperator> stressdiv_op;
-
-   /// The finite element space for the displacements
-   ParFiniteElementSpace &fe_space;
-   /// The integration rule for the quadrature
-   const IntegrationRule &ir;
-   /// The derivative type for the gradient
-   DerivativeType derivative_type;
-   /// The parallel mesh
-   ParMesh &pmesh;
-   /// The solution
-   mutable ParGridFunction u;
-   /// The nodes of the mesh
-   ParGridFunction &nodes;
-   /// The finite element space for the coordinates
-   ParFiniteElementSpace &coord_space;
    /// The quadrature space for symmetric 2nd order tensors
-   UniformParameterSpace q_space_symr2;
-
-   /// Essential true dofs
-   Array<int> ess_tdofs;
-   /// Essential dof values
-   Vector ess_dof_vals;
-
-   /// Get the autodiff Jacobian class
-   AutodiffLinearMomentumBalanceJacobian &GetJacobian()
-   {
-      MFEM_ASSERT(_autodiff_deriv_op, "Must have the autodiff op");
-      return *_autodiff_deriv_op;
-   }
+   std::unique_ptr<UniformParameterSpace> _q_space_symr2;
 
  private:
    /// The strain storage
-   mutable ParameterFunction _strain;
+   mutable std::unique_ptr<ParameterFunction> _strain;
    /// The stress storage
-   mutable ParameterFunction _stress;
-   /// The hand-coded Jacobian operator (at the given state)
-   mutable std::unique_ptr<LinearMomentumBalanceJacobian> _man_deriv_op;
-   /// The autodiff computed Jacobian operator (at the given state)
-   mutable std::unique_ptr<AutodiffLinearMomentumBalanceJacobian> _autodiff_deriv_op;
+   mutable std::unique_ptr<ParameterFunction> _stress;
+   /// Temporary storage for delta strain
+   mutable std::unique_ptr<ParameterFunction> _delta_strain;
+   /// Temporary storage for delta stress
+   mutable std::unique_ptr<ParameterFunction> _delta_stress;
+   /// Whether we're ordering by nodes or by vdim
+   std::optional<Ordering::Type> _ordering;
+
+   /// Material tangent (dstress/dstrain) obtained from NEML2 evaluated at the
+   /// current strain
+   std::optional<neml2::Tensor> _tangent;
+
+   /// The NEML2 constitutive model wrapped with MFEM APIs
+   const ConstitutiveModel _constit_op;
+
+   template <int vdim>
+   void ComputeStrainImpl(const Vector &X, ParameterFunction &strain) const;
+   void ComputeStrain(const Vector &X, ParameterFunction &strain) const;
+   template <int vdim>
+   void ComputeRImpl(const ParameterFunction &stress, Vector &R) const;
+   void ComputeR(const ParameterFunction &stress, Vector &R) const;
 };
 
 } // namespace mfem
