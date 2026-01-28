@@ -55,10 +55,6 @@ class NEML2StressDivergenceIntegrator
    mutable std::unique_ptr<ParameterFunction> _strain;
    /// The stress storage
    mutable std::unique_ptr<ParameterFunction> _stress;
-   /// Temporary storage for delta strain
-   mutable std::unique_ptr<ParameterFunction> _delta_strain;
-   /// Temporary storage for delta stress
-   mutable std::unique_ptr<ParameterFunction> _delta_stress;
    /// Whether we're ordering by nodes or by vdim
    std::optional<Ordering::Type> _ordering;
 

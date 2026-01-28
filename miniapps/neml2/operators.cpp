@@ -228,9 +228,6 @@ void NEML2StressDivergenceIntegrator::AddMultPA(const Vector &X,
 void NEML2StressDivergenceIntegrator::AssembleGradPA(const Vector &X,
                                                      const FiniteElementSpace &fes)
 {
-   _delta_strain->UseDevice(true);
-   _delta_stress->UseDevice(true);
-
    // Evaluate the tangent at the current state
    // displacement -> strain
    this->ComputeStrain(X, *_strain);

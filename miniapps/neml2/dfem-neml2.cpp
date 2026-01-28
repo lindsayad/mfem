@@ -121,8 +121,9 @@ int main(int argc, char *argv[])
 
    // Setup the parallel nonlinear form
    ParNonlinearForm f(&fe_space);
-   f.SetAssemblyLevel(AssemblyLevel::FULL);
+   f.SetAssemblyLevel(AssemblyLevel::PARTIAL);
    f.AddDomainIntegrator(new NEML2StressDivergenceIntegrator(cmodel));
+   f.Setup();
 
    // Linear solver
    CGSolver krylov(MPI_COMM_WORLD);
