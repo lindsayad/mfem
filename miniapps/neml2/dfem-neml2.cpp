@@ -37,10 +37,12 @@ int main(int argc, char *argv[])
    // Initialize MPI and HYPRE
    Mpi::Init();
    Hypre::Init();
+   int myid = Mpi::WorldRank();
 
    // Parse command-line options
    const char *device_config = "cpu";
    bool enable_pcamg = false;
+   const char *petscrc_file = "petscopts";
 
    OptionsParser args(argc, argv);
    args.AddOption(&device_config, "-d", "--device",
@@ -48,6 +50,8 @@ int main(int argc, char *argv[])
    args.AddOption(&enable_pcamg, "-pcamg", "--pcamg", "-no-pcamg", "--no-pcamg",
                   "Enable AMG as a preconditioner when using automatic "
                   "differentiation.");
+   args.AddOption(&petscrc_file, "-petscopts", "--petscopts",
+                  "PetscOptions file to use.");
    args.ParseCheck();
 
    // Enable hardware devices such as GPUs, and programming models such as CUDA
@@ -57,9 +61,11 @@ int main(int argc, char *argv[])
       device.Print();
    }
 
+   MFEMInitializePetsc(nullptr, nullptr, petscrc_file, nullptr);
+
    // Create a 3D mesh on the square domain [0,1]^3
    constexpr int dim = 3;
-   Mesh mesh = Mesh::MakeCartesian3D(4, 4, 4, Element::HEXAHEDRON);
+   Mesh mesh = Mesh::MakeCartesian3D(2, 2, 2, Element::HEXAHEDRON);
 
    // Define a parallel mesh
    ParMesh pmesh(MPI_COMM_WORLD, mesh);
@@ -70,6 +76,11 @@ int main(int argc, char *argv[])
    H1_FECollection fec(1, /*dim=*/dim);
    ParFiniteElementSpace fe_space(&pmesh, &fec, /*vdim=*/dim,
                                   Ordering::byNODES);
+   if (myid == 0)
+   {
+      std::cout << "Number of finite element unknowns: "
+                << fe_space.GlobalTrueVSize() << std::endl;
+   }
 
    // Set up the integration rule
    const auto &ir = IntRules.Get(pmesh.GetTypicalElementGeometry(), 3);
@@ -97,9 +108,12 @@ int main(int argc, char *argv[])
    cmodel->to(options);
 
    // Essential boundary condition (fixed)
+   Array<int> essential_bnd(pmesh.bdr_attributes.Max());
    Array<int> fixed_bnd(pmesh.bdr_attributes.Max());
    fixed_bnd = 0;
    fixed_bnd[2] = 1;
+   essential_bnd = 0;
+   essential_bnd[2] = 1;
    Vector uz(3);
    VectorConstantCoefficient zero_disp(uz);
 
@@ -107,6 +121,7 @@ int main(int argc, char *argv[])
    Array<int> displaced_bnd(pmesh.bdr_attributes.Max());
    displaced_bnd = 0;
    displaced_bnd[4] = 1;
+   essential_bnd[4] = 1;
    Vector ug(3);
    ug(0) = 0.001;
    ug(1) = 0.0;
@@ -123,30 +138,24 @@ int main(int argc, char *argv[])
    ParNonlinearForm f(&fe_space);
    f.SetAssemblyLevel(AssemblyLevel::PARTIAL);
    f.AddDomainIntegrator(new NEML2StressDivergenceIntegrator(cmodel));
+   Array<int> ess_tdof_list;
+   fe_space.GetEssentialTrueDofs(essential_bnd, ess_tdof_list);
+   f.SetEssentialTrueDofs(ess_tdof_list);
+
    f.Setup();
 
-   // Linear solver
-   CGSolver krylov(MPI_COMM_WORLD);
-   krylov.SetAbsTol(0.0);
-   krylov.SetRelTol(1e-12);
-   krylov.SetMaxIter(200);
-   krylov.SetPrintLevel(2);
-
    // Nonlinear solver
-   NewtonSolver newton(MPI_COMM_WORLD);
-   newton.SetOperator(f);
+   PetscNonlinearSolver newton(MPI_COMM_WORLD, f);
    newton.SetAbsTol(1e-8);
    newton.SetRelTol(1e-6);
    newton.SetMaxIter(10);
-   newton.SetSolver(krylov);
    newton.SetPrintLevel(1);
 
    // Solve
-   Vector X0(fe_space.GetTrueVSize());
-   Vector X(fe_space.GetTrueVSize());
-   fe_space.GetRestrictionMatrix()->Mult(u, X0);
-   newton.Mult(X0, X);
-   fe_space.GetProlongationMatrix()->Mult(X, u);
+   Vector R;
+   // Use the current state of u as the initial guess
+   newton.iterative_mode = true;
+   newton.Mult(R, u);
 
    // Save the solution in parallel using ParaView format
    ParaViewDataCollection dc("dfem-neml2-output", &pmesh);
